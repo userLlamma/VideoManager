@@ -1,0 +1,9 @@
+{
+    "api_type": "openai",  // 或 "aliyun", "azure", "huggingface"
+    "api_key": "your_api_key_here",
+
+    "video_folder": "/mnt/block_volume/video_materials/videos",
+    "output_folder": "/mnt/block_volume/video_materials/extracted_frames",
+    "db_path": "/mnt/block_volume/video_materials/database/video_materials.db",
+    "tags_file": "/mnt/block_volume/video_materials/database/video_tags.json"
+  }

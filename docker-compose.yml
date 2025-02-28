@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  api:
+    build: .
+    container_name: video-material-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app/static/uploads:/app/app/static/uploads
+      - ./app/static/extracted_frames:/app/app/static/extracted_frames
+      - ./video_materials.db:/app/video_materials.db
+    environment:
+      - API_TYPE=openai
+      - API_KEY=${OPENAI_API_KEY}
+      - MAX_WORKERS=3
+      - MIN_SCENE_CHANGE_THRESHOLD=30
+      - FRAME_SAMPLE_INTERVAL=24
+      - QUALITY=90
+      - MAX_FRAMES_PER_VIDEO=200
+    restart: unless-stopped
