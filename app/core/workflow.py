@@ -7,7 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.frame_extractor import FrameExtractor
+# 导入两个分类器
 from app.core.image_classifier import ImageClassifier
+from app.core.local_image_classifier import LocalImageClassifier
 from app.db import crud, models
 
 logger = logging.getLogger(__name__)
@@ -31,12 +33,25 @@ class MaterialProcessWorkflow:
             max_frames=settings.MAX_FRAMES_PER_VIDEO
         )
         
-        self.classifier = ImageClassifier(
-            api_type=settings.API_TYPE,
-            api_key=settings.API_KEY,
-            max_workers=settings.MAX_WORKERS,
-            custom_tags=settings.CUSTOM_TAGS
-        )
+        # 根据配置选择分类器
+        if settings.USE_LOCAL_CLASSIFIER:
+            logger.info("使用本地图像分类器")
+            self.classifier = LocalImageClassifier(
+                model_path=settings.LOCAL_MODEL_PATH,
+                model_size=settings.LOCAL_MODEL_SIZE,
+                max_workers=settings.MAX_WORKERS,
+                custom_tags=settings.CUSTOM_TAGS,
+                output_file=settings.LOCAL_TAGS_OUTPUT_FILE,
+                gpu_layers=settings.GPU_LAYERS
+            )
+        else:
+            logger.info("使用云端图像分类器")
+            self.classifier = ImageClassifier(
+                api_type=settings.API_TYPE,
+                api_key=settings.API_KEY,
+                max_workers=settings.MAX_WORKERS,
+                custom_tags=settings.CUSTOM_TAGS
+            )
     
     async def process_video(self, video_path: str, extract_only: bool = False) -> Dict[str, Any]:
         """
@@ -82,7 +97,11 @@ class MaterialProcessWorkflow:
                 }
             
             # 分类图像
-            logger.info("步骤2: 云端分类图像")
+            if isinstance(self.classifier, LocalImageClassifier):
+                logger.info("步骤2: 本地模型分类图像")
+            else:
+                logger.info("步骤2: 云端分类图像")
+                
             tag_results = self.classifier.classify_images(frame_paths)
             
             # 导入到数据库

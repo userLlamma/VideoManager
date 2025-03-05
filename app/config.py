@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     API_TYPE: str = Field("openai", env="API_TYPE")
     API_KEY: Optional[str] = Field(None, env="API_KEY")
     
+    # 本地分类器设置
+    USE_LOCAL_CLASSIFIER: bool = Field(False, env="USE_LOCAL_CLASSIFIER")
+    LOCAL_MODEL_PATH: Optional[str] = Field(None, env="LOCAL_MODEL_PATH")
+    LOCAL_MODEL_SIZE: str = Field("7b", env="LOCAL_MODEL_SIZE")
+    LOCAL_TAGS_OUTPUT_FILE: str = Field("local_image_tags.json", env="LOCAL_TAGS_OUTPUT_FILE")
+    GPU_LAYERS: int = Field(0, env="GPU_LAYERS")
+    
     # 视频处理设置
     MAX_WORKERS: int = Field(4, env="MAX_WORKERS")
     MIN_SCENE_CHANGE_THRESHOLD: int = Field(30, env="MIN_SCENE_CHANGE_THRESHOLD")
@@ -72,6 +79,20 @@ def load_config_from_json(config_file: str = "config.json") -> None:
                         
                 if "custom_tags" in config_data:
                     settings.CUSTOM_TAGS = config_data["custom_tags"]
+                
+                # 处理本地分类器设置
+                if "local_classifier" in config_data:
+                    local_config = config_data["local_classifier"]
+                    if "use_local_classifier" in local_config:
+                        settings.USE_LOCAL_CLASSIFIER = local_config["use_local_classifier"]
+                    if "model_path" in local_config:
+                        settings.LOCAL_MODEL_PATH = local_config["model_path"]
+                    if "model_size" in local_config:
+                        settings.LOCAL_MODEL_SIZE = local_config["model_size"]
+                    if "tags_output_file" in local_config:
+                        settings.LOCAL_TAGS_OUTPUT_FILE = local_config["tags_output_file"]
+                    if "gpu_layers" in local_config:
+                        settings.GPU_LAYERS = local_config["gpu_layers"]
                     
         except Exception as e:
             print(f"加载配置文件失败: {e}")

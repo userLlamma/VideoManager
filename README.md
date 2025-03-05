@@ -6,10 +6,11 @@
 
 - **视频关键帧提取**：自动检测场景变化，提取有意义的帧
 - **智能分类标签**：使用云端AI对图像进行分类和标签生成
+- **本地AI支持**：支持使用Qwen2.5-VL模型在本地进行图像分类，无需联网
 - **项目管理**：将素材组织到不同项目中
 - **标签管理**：创建、合并、删除标签
 - **高效搜索**：通过标签、描述或视频源搜索素材
-- **支持多种AI**：OpenAI Vision、Azure Vision、Aliyun Vision、HuggingFace
+- **支持多种AI**：OpenAI Vision、Azure Vision、Aliyun Vision、HuggingFace、以及本地Qwen2.5-VL模型
 
 ## 系统要求
 
@@ -61,6 +62,19 @@ export API_KEY=your_api_key_here
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
+### 前端运行
+
+```bash
+# 进入前端目录
+cd frontend
+
+# 安装依赖
+npm install
+
+# 启动前端服务
+npm start
+```
+
 或者使用自动安装脚本:
 
 ```bash
@@ -87,6 +101,93 @@ sudo ./setup.sh
 | FRAME_SAMPLE_INTERVAL | 帧采样间隔 | 24 |
 | QUALITY | JPEG保存质量(1-100) | 90 |
 | MAX_FRAMES_PER_VIDEO | 每个视频的最大提取帧数 | 200 |
+| USE_LOCAL_CLASSIFIER | 是否使用本地图像分类器 | False |
+| LOCAL_MODEL_PATH | 本地模型路径 | None |
+| LOCAL_MODEL_SIZE | 本地模型大小(1.5b/7b/72b) | 7b |
+| LOCAL_TAGS_OUTPUT_FILE | 本地标签输出文件 | local_image_tags.json |
+| GPU_LAYERS | GPU加速层数(0表示CPU模式) | 0 |
+
+以下是应该添加到 README.md 中关于 GPU 本地支持的内容：
+
+
+## 本地图像分类器
+
+系统支持使用本地Qwen2.5-VL多模态模型进行图像分类，无需依赖云端API。
+
+### 安装本地模型
+
+```bash
+# 安装依赖 (CPU版本)
+pip install llama-cpp-python pillow numpy tqdm requests
+
+# 下载并设置模型
+python app/tools/setup_local_model.py --size 7b --quant Q4_K_M
+```
+
+#### GPU加速支持
+
+如果您有兼容的NVIDIA GPU，可以安装GPU加速版本以显著提高处理速度：
+
+```bash
+# 首先卸载CPU版本(如果已安装)
+pip uninstall -y llama-cpp-python
+
+# 安装CUDA 11.8兼容版本
+pip install llama-cpp-python==0.2.25+cu118 -f https://github.com/jllllll/llama-cpp-python-cuBLAS-wheels/releases/
+
+# 或安装CUDA 12.1兼容版本
+pip install llama-cpp-python==0.2.25+cu121 -f https://github.com/jllllll/llama-cpp-python-cuBLAS-wheels/releases/
+```
+
+确保您已安装匹配的CUDA驱动。安装GPU版本后，您需要在配置中设置`GPU_LAYERS`大于0才能启用GPU加速。
+
+### 配置本地分类器
+
+编辑`.env`文件或设置环境变量:
+
+```
+USE_LOCAL_CLASSIFIER=True
+LOCAL_MODEL_PATH=/path/to/models/qwen2_5-vl-7b.Q4_K_M.gguf
+LOCAL_MODEL_SIZE=7b
+GPU_LAYERS=0  # 使用CPU模式
+# GPU_LAYERS=35  # 对于7b模型启用GPU加速(使用约35层)
+# GPU_LAYERS=80  # 对于72b模型启用GPU加速(使用更多层)
+```
+
+也可以在`config.json`中配置:
+
+```json
+{
+  "local_classifier": {
+    "use_local_classifier": true,
+    "model_path": "/path/to/models/qwen2_5-vl-7b.Q4_K_M.gguf",
+    "model_size": "7b",
+    "gpu_layers": 35  // 为GPU加速设置合适的层数
+  }
+}
+```
+
+### 本地模型选择指南
+
+- **Qwen2.5-VL-1.5B**: 适合低配置设备(2-3GB内存)，速度较快但精度有限
+- **Qwen2.5-VL-7B**: 推荐配置(8-10GB内存，CPU模式)，平衡速度和精度
+  - GPU模式: 需要约4GB GPU内存，处理速度提升5-10倍
+- **Qwen2.5-VL-72B**: 高精度但需要强大硬件
+  - CPU模式: 需要40GB+系统内存
+  - GPU模式: 需要至少12GB GPU内存，推荐24GB+
+
+默认使用Q4_K_M量化版本，对于大多数用例提供了良好的平衡。
+
+### GPU内存需求与性能指南
+
+|   模型大小   | GPU内存(Q4_K_M) | 推理速度 | 精度 |
+|------------|---------------|---------|-----|
+| 1.5B       | ~2GB          | 快       | 一般 |
+| 7B         | ~4GB          | 中       | 良好 |
+| 72B        | ~12-20GB      | 慢       | 优秀 |
+
+**注意**: GPU加速可以将处理时间从几秒/张图像减少到不到1秒/张图像，特别适合批量处理大量视频帧。
+
 
 ## 使用示例
 
@@ -130,6 +231,9 @@ video-material-system/
 │   └── main.py               # 主应用入口
 ├── Dockerfile                # Docker构建文件
 ├── docker-compose.yml        # Docker Compose配置
+├── frontend/                 # 前端代码
+│   ├── front.js              # 前端主文件
+│   └── package.json          # 前端依赖
 ├── requirements.txt          # Python依赖
 ├── setup.sh                  # 安装脚本
 └── README.md                 # 项目说明
