@@ -66,19 +66,13 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 ```bash
 # 进入前端目录
-cd frontend
+cd frontend/video-material-management-frontend
 
 # 安装依赖
-npm install
+yarn install
 
 # 启动前端服务
-npm start
-```
-
-或者使用自动安装脚本:
-
-```bash
-sudo ./setup.sh
+yarn start
 ```
 
 ## API文档
@@ -120,8 +114,11 @@ sudo ./setup.sh
 # 安装依赖 (CPU版本)
 pip install llama-cpp-python pillow numpy tqdm requests
 
+# llama-cpp-python依赖本地C语言编译环节，可以安装预编译的二进制包
+CMAKE_ARGS="-DCMAKE_CXX_FLAGS=-fopenmp -DLLAMA_BLAS=ON -DLLAMA_BLAS_VENDOR=OpenBLAS -DLLAMA_AVX=OFF -DLLAMA_AVX2=OFF -DLLAMA_CUDA=OFF -DLLAMA_ARM_NEON=ON -DLLAMA_DISABLE_LOGS=ON -DLLAMA_NATIVE=OFF" pip install --no-cache-dir llama-cpp-python
+
 # 下载并设置模型
-python app/tools/setup_local_model.py --size 7b --quant Q4_K_M
+python app/tools/setup_local_model.py --quant Q4_K_M 
 ```
 
 #### GPU加速支持

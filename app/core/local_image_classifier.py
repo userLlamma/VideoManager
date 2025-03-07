@@ -53,7 +53,8 @@ class LocalImageClassifier:
     def _get_default_model_path(self) -> str:
         """获取默认模型路径"""
         home = str(Path.home())
-        model_filename = f"qwen2_5-vl-{self.model_size}.Q4_K_M.gguf"
+        # 使用正确的模型文件名
+        model_filename = f"Qwen2-VL-7B-Instruct-Q4_K_M.gguf"
         return os.path.join(home, "models", "qwen-vl", model_filename)
         
     def _init_llama_model(self) -> None:
@@ -66,21 +67,21 @@ class LocalImageClassifier:
             
         if not os.path.exists(self.model_path):
             logger.error(f"模型文件不存在: {self.model_path}")
-            logger.info(f"请下载Qwen2.5-VL模型并放置于: {self.model_path}")
-            logger.info(f"下载地址参考: https://huggingface.co/Qwen/Qwen2.5-VL-{self.model_size}-GGUF")
+            logger.info(f"请下载Qwen2-VL模型并放置于: {self.model_path}")
+            logger.info(f"下载地址参考: https://huggingface.co/Qwen/Qwen2-VL-7B-Instruct-GGUF")
             raise FileNotFoundError(f"模型文件不存在: {self.model_path}")
             
         logger.info(f"正在加载模型: {self.model_path}")
         
-        # 根据模型大小设置合适的参数
+        # 根据模型大小设置合适的参数，增大上下文窗口
         if self.model_size == "1.5b":
-            ctx_size = 2048
+            ctx_size = 8192
             batch_size = 512
         elif self.model_size == "7b":
-            ctx_size = 4096
+            ctx_size = 16384  # 增大上下文窗口
             batch_size = 256
         else:  # 72b
-            ctx_size = 8192
+            ctx_size = 16384
             batch_size = 128
             
         try:
@@ -136,29 +137,55 @@ class LocalImageClassifier:
         
         logger.info(f"开始处理{len(new_images)}个新图像...")
         
-        # 使用线程池并行处理
-        results_count = 0
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = {executor.submit(self._classify_single_image, img): img for img in new_images}
+        try:
+            # 使用线程池并行处理
+            results_count = 0
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                futures = {executor.submit(self._classify_single_image, img): img for img in new_images}
+                
+                for future in futures:
+                    img_path = futures[future]
+                    try:
+                        tags = future.result()
+                        if tags:
+                            self.tags_data[img_path] = tags
+                            results_count += 1
+                            
+                            # 每10张图像保存一次结果
+                            if results_count % 10 == 0:
+                                logger.info(f"已处理 {results_count}/{len(new_images)} 张图像")
+                                self._save_tags()
+                    except Exception as e:
+                        logger.error(f"处理图像出错 {img_path}: {e}")
+                        # 添加带有错误信息的回退结果
+                        video_name = os.path.basename(os.path.dirname(img_path))
+                        self.tags_data[img_path] = {
+                            "tags": ["处理错误"],
+                            "source_video": video_name,
+                            "error": str(e)
+                        }
             
-            for future in futures:
-                img_path = futures[future]
-                try:
-                    tags = future.result()
-                    if tags:
-                        self.tags_data[img_path] = tags
-                        results_count += 1
-                        
-                        # 每10张图像保存一次结果
-                        if results_count % 10 == 0:
-                            logger.info(f"已处理 {results_count}/{len(new_images)} 张图像")
-                            self._save_tags()
-                except Exception as e:
-                    logger.error(f"处理图像出错 {img_path}: {e}")
+        except Exception as e:
+            logger.error(f"批量处理失败，使用回退方案: {e}")
+            # 使用简单的基于文件名的回退方案
+            for img_path in new_images:
+                if img_path not in self.tags_data:
+                    video_name = os.path.basename(os.path.dirname(img_path))
+                    # 从文件名提取简单信息作为标签
+                    filename = os.path.basename(img_path)
+                    tags = [part for part in filename.split('_') if len(part) > 2]
+                    
+                    self.tags_data[img_path] = {
+                        "tags": tags or ["自动标记"],
+                        "source_video": video_name,
+                        "scene": "未知场景",
+                        "elements": ["自动生成"],
+                        "method": "回退方案"
+                    }
         
         # 最终保存结果
         self._save_tags()
-        logger.info(f"完成分类，共处理 {results_count} 张图像")
+        logger.info(f"完成分类，共处理 {len(new_images)} 张图像")
         return self.tags_data
     
     def _convert_image_to_base64(self, image_path: str) -> str:
@@ -166,49 +193,65 @@ class LocalImageClassifier:
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode('utf-8')
     
-    def _prepare_image_for_model(self, image_path: str) -> str:
-        """准备图像格式给模型使用"""
+    def _prepare_image_for_model(self, image_path: str, max_size: int = 224, quality: int = 30) -> str:
+        """
+        准备图像格式给模型使用 - 使用极小尺寸和高压缩率
+        
+        参数:
+            image_path: 图像文件路径
+            max_size: 图像最大边长
+            quality: JPEG压缩质量(1-100)
+            
+        返回:
+            处理后的图像数据
+        """
         try:
-            # 读取图像并转换为base64
-            base64_image = self._convert_image_to_base64(image_path)
-            return f"![image](data:image/jpeg;base64,{base64_image})"
+            from PIL import Image
+            import io
+            import base64
+            
+            # 读取原始图像
+            with Image.open(image_path) as img:
+                # 调整图像大小 
+                ratio = min(max_size / img.width, max_size / img.height)
+                new_size = (int(img.width * ratio), int(img.height * ratio))
+                img = img.resize(new_size, Image.LANCZOS)
+                
+                # 转换为RGB并压缩
+                buffer = io.BytesIO()
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                img.save(buffer, format="JPEG", quality=quality)
+                buffer.seek(0)
+                
+                # 转换为base64
+                base64_image = base64.b64encode(buffer.read()).decode('utf-8')
+                return f"![image](data:image/jpeg;base64,{base64_image})"
         except Exception as e:
             logger.error(f"图像准备失败: {e}")
             raise
-            
+    
     def _classify_single_image(self, image_path: str) -> Optional[Dict[str, Any]]:
         """
-        对单个图像进行分类
+        对单个图像进行分类 - 使用最简短的提示和极度压缩的图像
         
         参数:
             image_path: 图像文件路径
             
         返回:
-            图像标签数据
+            图像标签数据，包含source_video属性
         """
         if not os.path.exists(image_path):
             logger.warning(f"图像不存在: {image_path}")
             return None
         
-        # 准备自定义标签提示
-        custom_tags_prompt = ""
-        if self.custom_tags:
-            custom_tags_prompt = f"请从以下标签中选择合适的: {', '.join(self.custom_tags)}。也可以添加不在此列表中但适合的其他标签。"
-        
         try:
-            # 准备图像
-            image_data = self._prepare_image_for_model(image_path)
+            # 使用极小尺寸和高压缩率
+            image_data = self._prepare_image_for_model(image_path, max_size=224, quality=30)
             
-            # 创建提示
+            # 最简化的提示
             prompt = f"""<|im_start|>user
-请详细分析这张图像，并为视频素材库提供以下信息:
-1. 提供5-10个描述图像内容的标签，每个标签1-3个词
-2. 场景类型（如室内、室外、城市、自然等）
-3. 主要视觉元素（如人物、建筑、动物等）
-4. 时间和光线特征（如白天、夜晚、黄昏等）
-5. 情绪或风格（如欢快、严肃、复古等）
-{custom_tags_prompt}
-请以JSON格式返回结果，包含tags, scene, elements, lighting, mood等字段。
+分析图像并提供: 1)3-5个标签 2)场景类型 3)主要内容。JSON格式返回。
 
 {image_data}
 <|im_end|>
@@ -216,23 +259,54 @@ class LocalImageClassifier:
 <|im_start|>assistant
 """
 
-            # 使用模型推理
-            response = self.model.create_completion(
-                prompt=prompt,
-                max_tokens=1024,
-                temperature=0.1,
-                top_p=0.9,
-                stop=["<|im_end|>"]
-            )
-            
-            # 获取生成的文本
-            generated_text = response["choices"][0]["text"]
-            
-            # 解析JSON
-            return self._extract_json_from_text(generated_text)
+            try:
+                # 使用模型推理
+                response = self.model.create_completion(
+                    prompt=prompt,
+                    max_tokens=512,  # 减少输出token数
+                    temperature=0.1,
+                    top_p=0.9,
+                    stop=["<|im_end|>"]
+                )
+                
+                # 获取生成的文本
+                generated_text = response["choices"][0]["text"]
+                
+                # 解析JSON
+                result = self._extract_json_from_text(generated_text)
+                
+                # 提取视频源信息并添加到结果中
+                video_name = os.path.basename(os.path.dirname(image_path))
+                if not video_name or video_name == '.':
+                    # 如果无法从路径获取，使用图像文件名的一部分
+                    parts = os.path.basename(image_path).split('_')
+                    video_name = '_'.join(parts[:-1]) if len(parts) > 1 else "unknown_video"
+                    
+                # 确保结果是字典类型并添加source_video属性
+                if not isinstance(result, dict):
+                    result = {"tags": ["无法解析"], "error": "模型输出格式不正确"}
+                
+                result["source_video"] = video_name
+                return result
+                
+            except Exception as e:
+                logger.error(f"模型推理失败: {e}")
+                # 创建包含source_video的错误结果
+                video_name = os.path.basename(os.path.dirname(image_path))
+                return {
+                    "tags": ["处理错误"],
+                    "source_video": video_name,
+                    "error": str(e)
+                }
+                
         except Exception as e:
             logger.error(f"分类失败: {e}")
-            return {"tags": ["处理错误"], "error": str(e)}
+            # 即使在完全失败时也返回带有source_video的结果
+            return {
+                "tags": ["处理错误"],
+                "source_video": "unknown_video",
+                "error": str(e)
+            }
             
     def _extract_json_from_text(self, text: str) -> Dict[str, Any]:
         """从生成的文本中提取JSON信息"""
