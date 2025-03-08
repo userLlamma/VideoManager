@@ -16,13 +16,13 @@ class TagInDB(TagBase):
     id: int
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class Tag(TagInDB):
     usage_count: int = 0
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class TagMerge(BaseModel):
     source_tag_ids: List[int]

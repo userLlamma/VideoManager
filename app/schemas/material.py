@@ -26,17 +26,17 @@ class MaterialInDB(MaterialBase):
     added_date: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class Material(MaterialInDB):
     tags: List[TagInfo] = []
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class MaterialWithTags(Material):
     tags: List[TagInfo] = []
     projects: List[int] = []
     
     class Config:
-        orm_mode = True
+        from_attributes = True

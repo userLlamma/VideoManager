@@ -125,6 +125,114 @@ class MaterialProcessWorkflow:
             logger.error(f"处理视频出错: {e}", exc_info=True)
             return {"success": False, "error": str(e), "video_path": video_path}
     
+    def _process_tags_from_result(self, tags_info: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        处理从分类器得到的标签结果，提取有用的标签
+        
+        参数:
+            tags_info: 分类器返回的标签信息
+            
+        返回:
+            处理后的标签列表，每个标签包含名称和类别
+        """
+        import re
+        
+        processed_tags = []
+        confidence_dict = {}
+        
+        # 从tags字段获取标签
+        if isinstance(tags_info, dict) and "tags" in tags_info:
+            if isinstance(tags_info["tags"], list):
+                for tag in tags_info["tags"]:
+                    if isinstance(tag, str) and tag.strip() and tag.strip() not in ["解析错误", "未识别", "处理错误"]:
+                        # 移除引号和特殊字符
+                        clean_tag = re.sub(r'[\"\'"""''\[\]\{\}]', '', tag.strip())
+                        if clean_tag:
+                            category = None
+                            if hasattr(self.classifier, 'guess_tag_category'):
+                                category = self.classifier.guess_tag_category(clean_tag)
+                            
+                            processed_tags.append({
+                                "name": clean_tag, 
+                                "category": category
+                            })
+        
+        # 从scene字段获取标签
+        if isinstance(tags_info, dict) and "scene" in tags_info:
+            if isinstance(tags_info["scene"], str) and tags_info["scene"].strip():
+                scene_tag = tags_info["scene"].strip()
+                # 移除引号和特殊字符
+                scene_tag = re.sub(r'[\"\'"""''\[\]\{\}]', '', scene_tag)
+                if scene_tag:
+                    processed_tags.append({
+                        "name": scene_tag,
+                        "category": "场景"
+                    })
+        
+        # 从elements字段获取标签
+        if isinstance(tags_info, dict) and "elements" in tags_info:
+            if isinstance(tags_info["elements"], list):
+                for element in tags_info["elements"]:
+                    if isinstance(element, str) and element.strip():
+                        # 移除引号和特殊字符
+                        clean_element = re.sub(r'[\"\'"""''\[\]\{\}]', '', element.strip())
+                        if clean_element:
+                            processed_tags.append({
+                                "name": clean_element,
+                                "category": "元素"
+                            })
+        
+        # 从lighting字段获取标签
+        if isinstance(tags_info, dict) and "lighting" in tags_info:
+            if isinstance(tags_info["lighting"], str) and tags_info["lighting"].strip():
+                light_tag = tags_info["lighting"].strip()
+                # 移除引号和特殊字符
+                light_tag = re.sub(r'[\"\'"""''\[\]\{\}]', '', light_tag)
+                if light_tag:
+                    processed_tags.append({
+                        "name": light_tag,
+                        "category": "光照"
+                    })
+        
+        # 从mood字段获取标签
+        if isinstance(tags_info, dict) and "mood" in tags_info:
+            if isinstance(tags_info["mood"], str) and tags_info["mood"].strip():
+                mood_tag = tags_info["mood"].strip()
+                # 移除引号和特殊字符
+                mood_tag = re.sub(r'[\"\'"""''\[\]\{\}]', '', mood_tag)
+                if mood_tag:
+                    processed_tags.append({
+                        "name": mood_tag,
+                        "category": "情绪"
+                    })
+        
+        # 提取confidence信息
+        if isinstance(tags_info, dict) and "confidence" in tags_info:
+            if isinstance(tags_info["confidence"], dict):
+                confidence_dict = tags_info["confidence"]
+        
+        # 对标签进行去重
+        unique_tags = []
+        seen_names = set()
+        
+        for tag in processed_tags:
+            if tag["name"].lower() not in seen_names:
+                seen_names.add(tag["name"].lower())
+                # 添加置信度
+                if tag["name"] in confidence_dict:
+                    tag["confidence"] = confidence_dict[tag["name"]]
+                unique_tags.append(tag)
+        
+        # 如果没有提取到任何标签，添加一个默认标签
+        if not unique_tags:
+            unique_tags.append({
+                "name": "未分类", 
+                "category": "其他",
+                "confidence": 1.0
+            })
+        
+        return unique_tags
+    
     def _import_to_database(
         self, 
         video_path: str, 
@@ -157,7 +265,7 @@ class MaterialProcessWorkflow:
                 
             # 创建素材记录
             try:
-                # 修复: 正确创建MaterialCreate对象
+                # 正确创建MaterialCreate对象
                 material_data = MaterialCreate(
                     source_video=video_path,
                     frame_path=frame_path,
@@ -169,81 +277,29 @@ class MaterialProcessWorkflow:
                 # 如果有标签结果，添加标签
                 if frame_path in tag_results:
                     tags_info = tag_results[frame_path]
-                    tag_ids = []
                     
-                    # 处理标准格式的标签
-                    all_tags = []
-                    
-                    # 从tags字段获取标签
-                    if isinstance(tags_info, dict) and "tags" in tags_info:
-                        if isinstance(tags_info["tags"], list):
-                            all_tags.extend(tags_info["tags"])
-                    
-                    # 从scene字段获取标签
-                    if isinstance(tags_info, dict) and "scene" in tags_info:
-                        if isinstance(tags_info["scene"], str) and tags_info["scene"].strip():
-                            all_tags.append(tags_info["scene"])
-                        elif isinstance(tags_info["scene"], list):
-                            all_tags.extend([item for item in tags_info["scene"] if isinstance(item, str) and item.strip()])
-                    
-                    # 从elements字段获取标签
-                    if isinstance(tags_info, dict) and "elements" in tags_info:
-                        if isinstance(tags_info["elements"], list):
-                            all_tags.extend([item for item in tags_info["elements"] if isinstance(item, str) and item.strip()])
-                    
-                    # 从lighting字段获取标签
-                    if isinstance(tags_info, dict) and "lighting" in tags_info:
-                        if isinstance(tags_info["lighting"], str) and tags_info["lighting"].strip():
-                            all_tags.append(tags_info["lighting"])
-                        elif isinstance(tags_info["lighting"], list):
-                            all_tags.extend([item for item in tags_info["lighting"] if isinstance(item, str) and item.strip()])
-                    
-                    # 从mood字段获取标签
-                    if isinstance(tags_info, dict) and "mood" in tags_info:
-                        if isinstance(tags_info["mood"], str) and tags_info["mood"].strip():
-                            all_tags.append(tags_info["mood"])
-                        elif isinstance(tags_info["mood"], list):
-                            all_tags.extend([item for item in tags_info["mood"] if isinstance(item, str) and item.strip()])
-                    
-                    # 处理直接是列表的情况
-                    if isinstance(tags_info, list):
-                        all_tags.extend([item for item in tags_info if isinstance(item, str) and item.strip()])
-                    
-                    # 清理标签列表
-                    clean_tags = []
-                    for tag in all_tags:
-                        if isinstance(tag, str) and tag.strip():
-                            clean_tags.append(tag.strip())
-                    
-                    # 去重
-                    clean_tags = list(set(clean_tags))
+                    # 使用增强的标签处理方法
+                    processed_tags = self._process_tags_from_result(tags_info)
                     
                     # 为素材添加标签
-                    for tag_name in clean_tags:
+                    for tag_data in processed_tags:
+                        tag_name = tag_data["name"]
+                        tag_category = tag_data.get("category", "其他")
+                        tag_confidence = tag_data.get("confidence", 1.0)
+                        
                         # 获取或创建标签
                         tag = crud.get_tag_by_name(self.db, tag_name)
                         if not tag:
-                            # 猜测标签类别
-                            tag_category = "其他"
-                            if hasattr(self.classifier, 'guess_tag_category'):
-                                tag_category = self.classifier.guess_tag_category(tag_name)
-                            
-                            # 修复：正确创建TagCreate对象
-                            tag_data = TagCreate(
+                            # 创建新标签
+                            tag_create_data = TagCreate(
                                 name=tag_name,
                                 category=tag_category
                             )
-                            tag = crud.create_tag(self.db, tag_data)
-                        
-                        # 获取置信度
-                        confidence = 1.0
-                        if isinstance(tags_info, dict) and "confidence" in tags_info:
-                            if isinstance(tags_info["confidence"], dict) and tag_name in tags_info["confidence"]:
-                                confidence = float(tags_info["confidence"][tag_name])
+                            tag = crud.create_tag(self.db, tag_create_data)
                         
                         # 添加标签关联
                         if tag and tag.id:
-                            crud.add_material_tags(self.db, material.id, [tag.id], confidence)
+                            crud.add_material_tags(self.db, material.id, [tag.id], tag_confidence)
                 
                 added_count += 1
                 

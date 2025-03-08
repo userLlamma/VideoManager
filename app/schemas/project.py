@@ -18,7 +18,7 @@ class ProjectInDB(ProjectBase):
     created_date: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ProjectMaterialAdd(BaseModel):
     material_ids: List[int]
@@ -28,4 +28,4 @@ class Project(ProjectInDB):
     material_count: int = 0
     
     class Config:
-        orm_mode = True
+        from_attributes = True
