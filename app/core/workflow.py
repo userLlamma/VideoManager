@@ -11,6 +11,7 @@ from app.core.frame_extractor import FrameExtractor
 from app.core.image_classifier import ImageClassifier
 from app.core.local_image_classifier import LocalImageClassifier
 from app.db import crud, models
+from app.schemas.material import MaterialCreate
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +142,11 @@ class MaterialProcessWorkflow:
         返回:
             添加的素材数量
         """
+        from app.schemas.material import MaterialCreate
+        from app.schemas.tag import TagCreate
+        
         added_count = 0
+        error_count = 0
         
         for timestamp, frame_path in frames_info:
             # 检查素材是否已存在
@@ -152,12 +157,14 @@ class MaterialProcessWorkflow:
                 
             # 创建素材记录
             try:
-                material = crud.create_material(self.db, {
-                    "source_video": video_path,
-                    "frame_path": frame_path,
-                    "timestamp": timestamp,
-                    "description": ""
-                })
+                # 修复: 正确创建MaterialCreate对象
+                material_data = MaterialCreate(
+                    source_video=video_path,
+                    frame_path=frame_path,
+                    timestamp=timestamp,
+                    description=""
+                )
+                material = crud.create_material(self.db, material_data)
                 
                 # 如果有标签结果，添加标签
                 if frame_path in tag_results:
@@ -174,33 +181,33 @@ class MaterialProcessWorkflow:
                     
                     # 从scene字段获取标签
                     if isinstance(tags_info, dict) and "scene" in tags_info:
-                        if isinstance(tags_info["scene"], str):
+                        if isinstance(tags_info["scene"], str) and tags_info["scene"].strip():
                             all_tags.append(tags_info["scene"])
                         elif isinstance(tags_info["scene"], list):
-                            all_tags.extend(tags_info["scene"])
+                            all_tags.extend([item for item in tags_info["scene"] if isinstance(item, str) and item.strip()])
                     
                     # 从elements字段获取标签
                     if isinstance(tags_info, dict) and "elements" in tags_info:
                         if isinstance(tags_info["elements"], list):
-                            all_tags.extend(tags_info["elements"])
+                            all_tags.extend([item for item in tags_info["elements"] if isinstance(item, str) and item.strip()])
                     
                     # 从lighting字段获取标签
                     if isinstance(tags_info, dict) and "lighting" in tags_info:
-                        if isinstance(tags_info["lighting"], str):
+                        if isinstance(tags_info["lighting"], str) and tags_info["lighting"].strip():
                             all_tags.append(tags_info["lighting"])
                         elif isinstance(tags_info["lighting"], list):
-                            all_tags.extend(tags_info["lighting"])
+                            all_tags.extend([item for item in tags_info["lighting"] if isinstance(item, str) and item.strip()])
                     
                     # 从mood字段获取标签
                     if isinstance(tags_info, dict) and "mood" in tags_info:
-                        if isinstance(tags_info["mood"], str):
+                        if isinstance(tags_info["mood"], str) and tags_info["mood"].strip():
                             all_tags.append(tags_info["mood"])
                         elif isinstance(tags_info["mood"], list):
-                            all_tags.extend(tags_info["mood"])
+                            all_tags.extend([item for item in tags_info["mood"] if isinstance(item, str) and item.strip()])
                     
                     # 处理直接是列表的情况
                     if isinstance(tags_info, list):
-                        all_tags.extend(tags_info)
+                        all_tags.extend([item for item in tags_info if isinstance(item, str) and item.strip()])
                     
                     # 清理标签列表
                     clean_tags = []
@@ -217,8 +224,16 @@ class MaterialProcessWorkflow:
                         tag = crud.get_tag_by_name(self.db, tag_name)
                         if not tag:
                             # 猜测标签类别
-                            tag_category = self.classifier.guess_tag_category(tag_name)
-                            tag = crud.create_tag(self.db, {"name": tag_name, "category": tag_category})
+                            tag_category = "其他"
+                            if hasattr(self.classifier, 'guess_tag_category'):
+                                tag_category = self.classifier.guess_tag_category(tag_name)
+                            
+                            # 修复：正确创建TagCreate对象
+                            tag_data = TagCreate(
+                                name=tag_name,
+                                category=tag_category
+                            )
+                            tag = crud.create_tag(self.db, tag_data)
                         
                         # 获取置信度
                         confidence = 1.0
@@ -227,7 +242,8 @@ class MaterialProcessWorkflow:
                                 confidence = float(tags_info["confidence"][tag_name])
                         
                         # 添加标签关联
-                        crud.add_material_tags(self.db, material.id, [tag.id], confidence)
+                        if tag and tag.id:
+                            crud.add_material_tags(self.db, material.id, [tag.id], confidence)
                 
                 added_count += 1
                 
@@ -236,8 +252,9 @@ class MaterialProcessWorkflow:
                     logger.info(f"已导入 {added_count} 个素材...")
                 
             except Exception as e:
+                error_count += 1
                 logger.error(f"导入素材出错 {frame_path}: {e}")
                 self.db.rollback()
         
-        logger.info(f"导入完成: 成功添加 {added_count} 个素材")
+        logger.info(f"导入完成: 成功添加 {added_count} 个素材, 失败 {error_count} 个")
         return added_count
