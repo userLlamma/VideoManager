@@ -30,7 +30,7 @@ ENV/
 env/
 venv/
 ENV/
-config.json
+*.json
 
 # SQLite database files
 *.db
