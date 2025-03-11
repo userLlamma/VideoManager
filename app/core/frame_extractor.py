@@ -102,6 +102,11 @@ class FrameExtractor:
                     timestamp = frame_index / fps
                     frame_filename = f"{video_name}_frame_{frame_index}_{self._format_timestamp(timestamp)}.jpg"
                     frame_path = os.path.join(video_output_dir, frame_filename)
+
+                    # 同时存储一个可通过Web访问的路径（用于数据库存储）
+                    web_path = os.path.join(self.output_dir, video_name, frame_filename)
+                    # 确保路径使用正斜杠，对Windows特别重要
+                    web_path = web_path.replace("\\", "/")
                     
                     # 使用JPEG质量设置保存图像
                     cv2.imwrite(frame_path, frame, [cv2.IMWRITE_JPEG_QUALITY, self.quality])

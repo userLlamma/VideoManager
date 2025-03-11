@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import logging
+import os
 
 from app.api import api_router
 from app.config import settings
@@ -33,8 +34,18 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_headers=["*"],
     )
 
+# 确保静态目录存在
+os.makedirs(settings.OUTPUT_FOLDER, exist_ok=True)
+os.makedirs(os.path.join("app", "static"), exist_ok=True)
+
 # 挂载静态文件
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+# 如果OUTPUT_FOLDER不在app/static下，则额外挂载
+if not settings.OUTPUT_FOLDER.startswith("app/static"):
+    extract_dir_name = os.path.basename(settings.OUTPUT_FOLDER)
+    app.mount("/extracted_frames", StaticFiles(directory=settings.OUTPUT_FOLDER), name="extracted_frames")
+    logger.info(f"挂载额外静态目录: {settings.OUTPUT_FOLDER} -> /extracted_frames")
 
 # 注册API路由
 app.include_router(api_router, prefix=settings.API_V1_STR)

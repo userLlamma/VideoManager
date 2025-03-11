@@ -58,14 +58,42 @@ def read_material(material_id: int, db: Session = Depends(get_db)):
 @router.get("/{material_id}/image")
 def get_material_image(material_id: int, db: Session = Depends(get_db)):
     """获取素材图像文件"""
+    logger.info(f"请求图像，素材ID: {material_id}")
+    
+    # 获取素材信息
     material = crud.get_material(db, material_id)
     if not material:
+        logger.error(f"素材不存在，ID: {material_id}")
         raise HTTPException(status_code=404, detail="素材不存在")
     
+    # 记录路径信息以便调试
+    logger.info(f"素材图像路径: {material.frame_path}")
+    
+    # 检查文件是否存在
     if not os.path.exists(material.frame_path):
+        logger.error(f"素材图像文件不存在: {material.frame_path}")
         raise HTTPException(status_code=404, detail="素材图像文件不存在")
     
-    return FileResponse(material.frame_path)
+    # 检查文件可读性
+    try:
+        with open(material.frame_path, "rb") as f:
+            pass
+        logger.info(f"文件可读: {material.frame_path}")
+    except Exception as e:
+        logger.error(f"无法读取文件: {material.frame_path}, 错误: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"无法读取图像文件: {str(e)}")
+    
+    # 获取文件媒体类型
+    content_type = "image/jpeg"  # 默认假设是JPEG
+    if material.frame_path.lower().endswith(".png"):
+        content_type = "image/png"
+    
+    # 返回文件响应
+    return FileResponse(
+        material.frame_path, 
+        media_type=content_type,
+        headers={"Cache-Control": "max-age=3600"}  # 添加缓存控制
+    )
 
 @router.put("/{material_id}", response_model=schemas.Material)
 def update_material(
