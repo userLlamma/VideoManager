@@ -1,274 +1,247 @@
 # 视频素材管理系统
 
-一个基于FastAPI的视频素材管理系统，用于从视频中提取关键帧、自动分类并提供检索功能。适用于影视制作团队对素材进行分类和管理。
+一个基于FastAPI的视频素材管理系统，用于提取、分类和管理视频的关键帧。该系统可以从视频中提取场景变化帧，使用AI进行自动标签分类，并提供API接口进行素材管理。
 
 ## 功能特点
 
-- **视频关键帧提取**：自动检测场景变化，提取有意义的帧
-- **智能分类标签**：使用云端AI对图像进行分类和标签生成
-- **本地AI支持**：支持使用Qwen2.5-VL模型在本地进行图像分类，无需联网
-- **项目管理**：将素材组织到不同项目中
-- **标签管理**：创建、合并、删除标签
-- **高效搜索**：通过标签、描述或视频源搜索素材
-- **支持多种AI**：OpenAI Vision、Azure Vision、Aliyun Vision、HuggingFace、以及本地Qwen2.5-VL模型
+- **视频帧提取**：自动从视频中提取关键帧和场景变化
+- **AI图像分类**：支持使用OpenAI Vision API或本地Qwen-VL模型对图像进行标签分类
+- **灵活的标签系统**：支持标签分类、使用次数统计和标签合并
+- **项目管理**：可以将素材组织到不同项目中
+- **RESTful API**：完整的API接口，支持素材的CRUD操作
+- **批量处理**：支持批量上传和处理视频文件
 
-## 系统要求
+## 技术栈
+
+- **后端框架**：FastAPI
+- **数据库**：SQLAlchemy ORM (支持SQLite等)
+- **图像处理**：OpenCV
+- **AI图像分类**：
+  - 云端选项：阿里云视觉智能API、HuggingFace、Azure Computer Vision
+  - 本地选项：Qwen-VL (基于llama.cpp)
+
+## 安装指南
+
+### 前提条件
 
 - Python 3.8+
-- OpenCV
-- FastAPI
-- SQLAlchemy
-- 足够的存储空间用于视频和图像文件
-- (可选)AI API密钥
+- pip
+- 如果使用本地分类器：llama.cpp (需支持Qwen2-VL)
 
-## 快速开始
-
-### 使用Docker
+### 基础安装
+1. 安装依赖
 
 ```bash
-# 克隆仓库
-git clone https://github.com/yourusername/video-material-system.git
-cd video-material-system
-
-# 设置API密钥
-echo "OPENAI_API_KEY=your_api_key_here" > .env
-
-# 启动服务
-docker-compose up -d
+conda env create -f environment.yml
 ```
 
-### 手动安装
+2. 配置环境
 
-```bash
-# 克隆仓库
-git clone https://github.com/yourusername/video-material-system.git
-cd video-material-system
+可以通过以下两种方式配置系统：
 
-# 创建虚拟环境
-python -m venv venv
-source venv/bin/activate  # 在Windows上使用 venv\Scripts\activate
-
-# 安装依赖
-pip install -r requirements.txt
-
-# 创建必要的目录
-mkdir -p app/static/uploads app/static/extracted_frames
-
-# 设置环境变量
-export API_TYPE=openai
-export API_KEY=your_api_key_here
-
-# 启动服务
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-### 前端运行
-
-```bash
-# 进入前端目录
-cd frontend/video-material-management-frontend
-
-# 安装依赖
-yarn install
-
-# 启动前端服务
-yarn start
-```
-
-## API文档
-
-启动服务后，API文档可在以下URL访问：
-
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-
-## 配置
-
-系统可以通过环境变量或`.env`文件进行配置，主要配置项包括：
-
-| 变量名 | 说明 | 默认值 |
-|--------|------|--------|
-| API_TYPE | AI API类型(openai/azure/aliyun/huggingface) | openai |
-| API_KEY | API密钥 | - |
-| MAX_WORKERS | 并行处理的最大线程数 | 4 |
-| MIN_SCENE_CHANGE_THRESHOLD | 场景变化检测阈值(越低越敏感) | 30 |
-| FRAME_SAMPLE_INTERVAL | 帧采样间隔 | 24 |
-| QUALITY | JPEG保存质量(1-100) | 90 |
-| MAX_FRAMES_PER_VIDEO | 每个视频的最大提取帧数 | 200 |
-| USE_LOCAL_CLASSIFIER | 是否使用本地图像分类器 | False |
-| LOCAL_MODEL_PATH | 本地模型路径 | None |
-| LOCAL_MODEL_SIZE | 本地模型大小(1.5b/7b/72b) | 7b |
-| LOCAL_TAGS_OUTPUT_FILE | 本地标签输出文件 | local_image_tags.json |
-| GPU_LAYERS | GPU加速层数(0表示CPU模式) | 0 |
-
-以下是应该添加到 README.md 中关于 GPU 本地支持的内容：
-
-
-## 本地图像分类器
-
-系统支持使用本地Qwen2.5-VL多模态模型进行图像分类，无需依赖云端API。
-
-### 安装本地模型
-
-```bash
-# 安装依赖 (CPU版本)
-pip install llama-cpp-python pillow numpy tqdm requests
-
-# llama-cpp-python依赖本地C语言编译环节，可以安装预编译的二进制包
-CMAKE_ARGS="-DCMAKE_CXX_FLAGS=-fopenmp -DLLAMA_BLAS=ON -DLLAMA_BLAS_VENDOR=OpenBLAS -DLLAMA_AVX=OFF -DLLAMA_AVX2=OFF -DLLAMA_CUDA=OFF -DLLAMA_ARM_NEON=ON -DLLAMA_DISABLE_LOGS=ON -DLLAMA_NATIVE=OFF" pip install --no-cache-dir llama-cpp-python
-
-# 下载并设置模型
-python app/tools/setup_local_model.py --quant Q4_K_M 
-```
-
-#### GPU加速支持
-
-如果您有兼容的NVIDIA GPU，可以安装GPU加速版本以显著提高处理速度：
-
-```bash
-# 首先卸载CPU版本(如果已安装)
-pip uninstall -y llama-cpp-python
-
-# 安装CUDA 11.8兼容版本
-pip install llama-cpp-python==0.2.25+cu118 -f https://github.com/jllllll/llama-cpp-python-cuBLAS-wheels/releases/
-
-# 或安装CUDA 12.1兼容版本
-pip install llama-cpp-python==0.2.25+cu121 -f https://github.com/jllllll/llama-cpp-python-cuBLAS-wheels/releases/
-```
-
-确保您已安装匹配的CUDA驱动。安装GPU版本后，您需要在配置中设置`GPU_LAYERS`大于0才能启用GPU加速。
-
-### 配置本地分类器
-
-编辑`.env`文件或设置环境变量:
+#### 方法1：创建`.env`文件或配置环境变量
 
 ```
-USE_LOCAL_CLASSIFIER=True
-LOCAL_MODEL_PATH=/path/to/models/qwen2_5-vl-7b.Q4_K_M.gguf
-LOCAL_MODEL_SIZE=7b
-GPU_LAYERS=0  # 使用CPU模式
-# GPU_LAYERS=35  # 对于7b模型启用GPU加速(使用约35层)
-# GPU_LAYERS=80  # 对于72b模型启用GPU加速(使用更多层)
+# 数据库配置
+DATABASE_URL=sqlite:///./video_materials.db
+
+# 文件路径配置
+VIDEO_FOLDER=./app/static/uploads
+OUTPUT_FOLDER=./app/static/extracted_frames
+
+# API配置 (如果使用云端API)
+API_TYPE=openai  # 可选: openai, aliyun, huggingface, azure
+API_KEY=your_api_key_here
+
+# 本地分类器配置
+USE_LOCAL_CLASSIFIER=False  # 设为True启用本地分类器
+LOCAL_MODEL_PATH=/path/to/Qwen2-VL-2B-Instruct-Q4_K_M.gguf
+LOCAL_MODEL_SIZE=2b  # 2b或7b
+QWEN_VL_MMPROJ_PATH=/path/to/qwen-qwen2-vl-2b-instruct-vision.gguf
+QWEN_VL_CLI_PATH=/path/to/llama-qwen2vl-cli
+GPU_LAYERS=0  # 使用GPU的层数，0表示纯CPU
 ```
 
-也可以在`config.json`中配置:
+#### 方法2：使用config.json文件
+
+创建一个`config.json`文件（可以从`config.example.json`复制并修改）：
 
 ```json
 {
+  "api_type": "openai",
+  "api_key": "your_api_key_here",
+  "video_folder": "./app/static/uploads",
+  "output_folder": "./app/static/extracted_frames",
+  "extraction": {
+    "min_scene_change_threshold": 30,
+    "frame_sample_interval": 24,
+    "quality": 90,
+    "max_frames_per_video": 200
+  },
   "local_classifier": {
     "use_local_classifier": true,
-    "model_path": "/path/to/models/qwen2_5-vl-7b.Q4_K_M.gguf",
-    "model_size": "7b",
-    "gpu_layers": 35  // 为GPU加速设置合适的层数
-  }
+    "model_path": "/path/to/Qwen2-VL-2B-Instruct-Q4_K_M.gguf",
+    "model_size": "2b",
+    "mmproj_path": "/path/to/qwen-qwen2-vl-2b-instruct-vision.gguf",
+    "cli_path": "/path/to/llama-qwen2vl-cli",
+    "gpu_layers": 0
+  },
+  "custom_tags": [
+    "人物特写", "风景", "动作", "对话", "过渡", "特效",
+    "室内", "室外", "白天", "夜晚", "城市", "自然"
+  ]
 }
 ```
 
-### 本地模型选择指南
+系统会优先使用`config.json`中的设置，其次使用环境变量或`.env`文件中的设置。
 
-- **Qwen2.5-VL-1.5B**: 适合低配置设备(2-3GB内存)，速度较快但精度有限
-- **Qwen2.5-VL-7B**: 推荐配置(8-10GB内存，CPU模式)，平衡速度和精度
-  - GPU模式: 需要约4GB GPU内存，处理速度提升5-10倍
-- **Qwen2.5-VL-72B**: 高精度但需要强大硬件
-  - CPU模式: 需要40GB+系统内存
-  - GPU模式: 需要至少12GB GPU内存，推荐24GB+
+### 本地分类器安装 (可选)
 
-默认使用Q4_K_M量化版本，对于大多数用例提供了良好的平衡。
-
-### GPU内存需求与性能指南
-
-|   模型大小   | GPU内存(Q4_K_M) | 推理速度 | 精度 |
-|------------|---------------|---------|-----|
-| 1.5B       | ~2GB          | 快       | 一般 |
-| 7B         | ~4GB          | 中       | 良好 |
-| 72B        | ~12-20GB      | 慢       | 优秀 |
-
-**注意**: GPU加速可以将处理时间从几秒/张图像减少到不到1秒/张图像，特别适合批量处理大量视频帧。
-
-
-## 使用示例
-
-### 1. 上传和处理视频
+如果要使用本地Qwen-VL分类器，可以使用提供的安装脚本：
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/processing/upload" \
-  -H "accept: application/json" \
-  -H "Content-Type: multipart/form-data" \
-  -F "file=@your_video.mp4" \
-  -F "extract_only=false"
+python app/tools/install_qwen_vl.py --model-size 2b
 ```
 
-### 2. 搜索素材
+该脚本将：
+1. 检查和安装llama.cpp (如有需要)
+2. 下载Qwen2-VL GGUF模型文件
+3. 自动配置系统设置
+
+### 测试本地分类器 (可选)
+
+可以使用以下命令测试本地分类器是否正常工作：
 
 ```bash
-curl -X GET "http://localhost:8000/api/v1/materials?search=人物&tag_ids=1,5,8&skip=0&limit=20" \
-  -H "accept: application/json"
+python app/tools/test_qwen_vl_classifier.py /path/to/test_image.jpg
 ```
 
-### 3. 创建项目
+## 启动应用
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/projects" \
-  -H "accept: application/json" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"新项目","description":"项目描述..."}'
+uvicorn app.main:app --reload
 ```
 
-## 结构说明
+应用将在 `http://localhost:8000` 启动，API文档可在 `http://localhost:8000/docs` 访问。
 
-```
-video-material-system/
-├── app/                      # 主应用代码
-│   ├── api/                  # API端点
-│   ├── core/                 # 核心功能模块
-│   ├── db/                   # 数据库模型和操作
-│   ├── schemas/              # Pydantic模式
-│   ├── static/               # 静态文件(上传和提取的帧)
-│   ├── config.py             # 配置处理
-│   └── main.py               # 主应用入口
-├── Dockerfile                # Docker构建文件
-├── docker-compose.yml        # Docker Compose配置
-├── frontend/                 # 前端代码
-│   ├── front.js              # 前端主文件
-│   └── package.json          # 前端依赖
-├── requirements.txt          # Python依赖
-├── setup.sh                  # 安装脚本
-└── README.md                 # 项目说明
-```
+## API接口
 
-## 接口说明
-
-系统提供以下主要API:
+系统提供以下主要API接口：
 
 ### 素材管理
-- GET /api/v1/materials - 获取素材列表
-- GET /api/v1/materials/{id} - 获取素材详情
-- GET /api/v1/materials/{id}/image - 获取素材图像
-- PUT /api/v1/materials/{id} - 更新素材信息
-- DELETE /api/v1/materials/{id} - 删除素材
+- `GET /api/v1/materials` - 获取素材列表
+- `GET /api/v1/materials/{id}` - 获取素材详情
+- `GET /api/v1/materials/{id}/image` - 获取素材图像
+- `PUT /api/v1/materials/{id}` - 更新素材信息
+- `DELETE /api/v1/materials/{id}` - 删除素材
+- `POST /api/v1/materials/{id}/tags` - 为素材添加标签
+- `DELETE /api/v1/materials/{id}/tags/{tag_id}` - 移除素材标签
 
 ### 标签管理
-- GET /api/v1/tags - 获取标签列表
-- GET /api/v1/tags/categories - 获取标签类别
-- POST /api/v1/tags - 创建新标签
-- PUT /api/v1/tags/{id} - 更新标签
-- DELETE /api/v1/tags/{id} - 删除标签
-- POST /api/v1/tags/merge - 合并标签
+- `GET /api/v1/tags` - 获取标签列表
+- `GET /api/v1/tags/categories` - 获取标签类别
+- `GET /api/v1/tags/{id}` - 获取标签详情
+- `POST /api/v1/tags` - 创建新标签
+- `PUT /api/v1/tags/{id}` - 更新标签
+- `DELETE /api/v1/tags/{id}` - 删除标签
+- `POST /api/v1/tags/merge` - 合并多个标签
+- `GET /api/v1/tags/{id}/materials` - 获取使用此标签的素材
 
 ### 项目管理
-- GET /api/v1/projects - 获取项目列表
-- GET /api/v1/projects/{id} - 获取项目详情
-- POST /api/v1/projects - 创建新项目
-- PUT /api/v1/projects/{id} - 更新项目
-- DELETE /api/v1/projects/{id} - 删除项目
-- GET /api/v1/projects/{id}/materials - 获取项目素材
-- POST /api/v1/projects/{id}/materials - 添加素材到项目
+- `GET /api/v1/projects` - 获取项目列表
+- `GET /api/v1/projects/{id}` - 获取项目详情
+- `POST /api/v1/projects` - 创建新项目
+- `PUT /api/v1/projects/{id}` - 更新项目
+- `DELETE /api/v1/projects/{id}` - 删除项目
+- `GET /api/v1/projects/{id}/materials` - 获取项目中的素材
+- `POST /api/v1/projects/{id}/materials` - 将素材添加到项目
+- `DELETE /api/v1/projects/{id}/materials/{material_id}` - 从项目中移除素材
 
-### 处理
-- POST /api/v1/processing/upload - 上传并处理视频
-- POST /api/v1/processing/process - 处理已存在的视频
-- POST /api/v1/processing/batch - 批量处理视频
+### 视频处理
+- `POST /api/v1/processing/upload` - 上传并处理视频
+- `POST /api/v1/processing/process` - 处理已存在的视频
+- `POST /api/v1/processing/batch` - 批量处理文件夹中的视频
+
+## 配置项
+
+系统配置可通过环境变量或`config.json`文件设置，主要配置项包括：
+
+### 视频处理配置
+
+- `MIN_SCENE_CHANGE_THRESHOLD`: 场景变化检测灵敏度 (默认: 30)
+- `FRAME_SAMPLE_INTERVAL`: 帧采样间隔 (默认: 24)
+- `QUALITY`: 输出图像质量 (默认: 90)
+- `MAX_FRAMES_PER_VIDEO`: 每个视频最大提取帧数 (默认: 200)
+
+### 分类器配置
+
+- `USE_LOCAL_CLASSIFIER`: 是否使用本地分类器
+- `API_TYPE`: 云API类型 (openai, aliyun, huggingface, azure)
+- `API_KEY`: API密钥
+- `MAX_WORKERS`: 并行处理线程数 (默认: 4)
+- `CUSTOM_TAGS`: 自定义标签列表，用于引导分类器生成特定领域的标签
+
+### 本地分类器专用配置
+
+- `LOCAL_MODEL_PATH`: Qwen-VL模型文件路径
+- `LOCAL_MODEL_SIZE`: 模型大小 (2b 或 7b)
+- `QWEN_VL_MMPROJ_PATH`: 视觉投影文件路径
+- `QWEN_VL_CLI_PATH`: llama-qwen2vl-cli可执行文件路径
+- `GPU_LAYERS`: 使用GPU的层数 (0表示纯CPU)
+
+> **注意**: 当前Qwen-VL分类器主要支持英文输出标签，系统会尝试将输出转换为中文，但可能需要额外处理以获得完全的中文支持。
+
+## 自定义标签示例
+
+可以在配置中定义常用标签，用于引导AI分类器。**注意：当使用Qwen2-VL本地分类器时，请使用英文标签，以避免命令行执行错误**：
+
+```json
+"CUSTOM_TAGS": [
+    "portrait", "landscape", "action", "dialogue", "transition", "effect",
+    "indoor", "outdoor", "daytime", "night", "urban", "nature",
+    "fast", "slow motion", "emotional", "narrative", "black and white", "color"
+]
+```
+
+如果使用OpenAI等云端API，可以使用中文标签：
+
+```json
+"CUSTOM_TAGS": [
+    "人物特写", "风景", "动作", "对话", "过渡", "特效",
+    "室内", "室外", "白天", "夜晚", "城市", "自然",
+    "快速", "慢动作", "情感", "叙事", "黑白", "彩色"
+]
+```
+
+## 性能优化
+
+### 本地分类器优化
+
+1. 使用更小的模型 (2b) 可提高处理速度
+2. 适当设置GPU_LAYERS参数能显著提升性能
+3. 合理设置MAX_WORKERS参数，建议为CPU核心数的一半
+4. 第一次使用本地分类器时会较慢，因为需要加载模型，之后会快得多
+
+### 视频处理优化
+
+1. 调整FRAME_SAMPLE_INTERVAL可减少处理时间
+2. 增大MIN_SCENE_CHANGE_THRESHOLD可减少提取的帧数
+3. 设置MAX_FRAMES_PER_VIDEO限制单个视频的处理量
+
+## 已知问题与待办事项
+
+### 已知问题
+1. Qwen-VL分类器目前主要支持英文输出标签。虽然系统会尝试解析并转换这些标签，但可能需要额外的处理步骤来获得更好的中文支持。
+2. 使用本地分类器时，首次处理可能较慢，这是因为需要加载大型模型文件。
+3. 在Windows系统上，使用本地分类器可能需要额外配置路径格式。
+4. 使用Qwen2-VL时自定义标签必须使用英文，否则可能导致命令行执行错误。
+
+### 待办事项
+1. **云端API集成完善**：目前多种云端API（阿里云, HuggingFace, Azure）的集成尚在调试中。
+2. **混合分类处理流程**：计划实现本地与云端分级处理机制，敏感素材优先使用本地分类器处理以保护数据隐私，非敏感素材可选择使用云端API获得更高精度的分类结果。
+3. **中文支持改进**：优化Qwen2-VL模型的中文输出支持，或添加更好的翻译处理机制。
 
 ## 许可证
 
 MIT
+
