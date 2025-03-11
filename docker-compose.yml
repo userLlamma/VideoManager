@@ -17,5 +17,5 @@ services:
       - MIN_SCENE_CHANGE_THRESHOLD=30
       - FRAME_SAMPLE_INTERVAL=24
       - QUALITY=90
-      - MAX_FRAMES_PER_VIDEO=200
+      - MAX_FRAMES_PER_VIDEO=5
     restart: unless-stopped
