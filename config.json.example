@@ -19,7 +19,7 @@
     "model_size": "7b",
     "tags_output_file": "local_image_tags.json",
     "gpu_layers": 0,
-    "mmproj_path": "/path/to/models/qwen-vl/qwen-qwen2-vl-7b-instruct-vision.gguf",
+    "mmproj_path": "/path/to/models/qwen-vl/qwen2-vl-7b-instruct-vision.gguf",
     "cli_path": "/path/to/llama.cpp/bin/llama-qwen2vl-cli"
   }
 }
