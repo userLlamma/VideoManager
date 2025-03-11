@@ -93,6 +93,11 @@ coverage.xml
 
 # API keys and secrets
 *.pem
-config.json
+*.json
 local_image_tags.json
 local_image_tags.json
+
+# shell scripts
+*.sh
+*.ps1
+*.bat
