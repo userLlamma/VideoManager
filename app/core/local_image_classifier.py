@@ -309,19 +309,20 @@ class QwenVLClassifier:
                 f"- scene: type of scene (indoor, outdoor, nature, urban, etc.)\n"
                 f"- elements: array of main visual elements in the image\n"
                 f"- lighting: lighting conditions (daylight, night, etc.)\n"
-                f"- mood: emotional tone or style\n\n"
+                f"- mood: emotional tone or style\n"
+                f"- composition: compositional characteristics (close-up, wide shot, etc.)\n\n"
                 f"Return ONLY the JSON without explanation."
             )
             
             # Prepare image (resize if needed)
             prepared_image = self._prepare_image(image_path)
             
-            # Build command
+            # Build command - use list form for subprocess to handle escaping correctly
             cmd = [
                 self.cli_path,
                 "-m", self.model_path,
                 "--mmproj", self.mmproj_path,
-                "-p", prompt,
+                "-p", prompt,  # subprocess will handle proper escaping
                 "--image", prepared_image,
                 "-ngl", str(self.gpu_layers),
                 "-n", "512"  # Max tokens to generate
@@ -329,13 +330,15 @@ class QwenVLClassifier:
             
             logger.debug(f"Running command: {' '.join(cmd)}")
             
-            # Execute command
+            # Execute command using subprocess.Popen with list arguments
+            # This avoids shell interpretation issues with the prompt
             start_time = time.time()
             process = subprocess.Popen(
                 cmd, 
                 stdout=subprocess.PIPE, 
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
+                shell=False  # Important: Don't use shell=True to avoid quoting issues
             )
             stdout, stderr = process.communicate()
             
@@ -609,28 +612,32 @@ class QwenVLClassifier:
         tag_lower = tag_name.lower()
         
         # Scene category
-        if any(word in tag_lower for word in ['室内', '室外', '城市', '自然', '景观', '街道', '办公室', '家']):
-            return "场景"
-            
+        if any(word in tag_lower for word in ['indoor', 'outdoor', 'city', 'nature', 'landscape', 'street', 'office', 'home', 'urban', 'rural']):
+            return "scene"
+        
         # Lighting category
-        if any(word in tag_lower for word in ['白天', '夜晚', '黄昏', '黎明', '阴天', '晴天', '阳光']):
-            return "光照"
-            
+        if any(word in tag_lower for word in ['daylight', 'night', 'sunset', 'dawn', 'sunrise', 'cloudy', 'sunny', 'light', 'shadow', 'bright', 'dark']):
+            return "lighting"
+        
         # Mood category
-        if any(word in tag_lower for word in ['快乐', '悲伤', '紧张', '兴奋', '平静', '焦虑', '愉快']):
-            return "情绪"
-            
+        if any(word in tag_lower for word in ['happy', 'sad', 'tense', 'excited', 'calm', 'anxious', 'joyful', 'peaceful', 'dramatic', 'serene']):
+            return "mood"
+        
         # Composition category
-        if any(word in tag_lower for word in ['特写', '中景', '远景', '全景', '俯视', '仰视', '平视']):
-            return "构图"
-            
+        if any(word in tag_lower for word in ['closeup', 'medium shot', 'wide shot', 'panorama', 'overhead', 'low angle', 'high angle', 'eye level']):
+            return "composition"
+        
         # Subject category
-        if any(word in tag_lower for word in ['人物', '动物', '建筑', '自然', '交通', '食物']):
-            return "主体"
-            
+        if any(word in tag_lower for word in ['person', 'people', 'animal', 'building', 'architecture', 'nature', 'transportation', 'food', 'landscape', 'object']):
+            return "subject"
+        
         # Action category
-        if any(word in tag_lower for word in ['奔跑', '行走', '交谈', '站立', '坐着', '工作']):
-            return "动作"
-            
+        if any(word in tag_lower for word in ['running', 'walking', 'talking', 'standing', 'sitting', 'working', 'moving', 'dancing', 'playing']):
+            return "action"
+        
+        # Additional categories
+        if any(word in tag_lower for word in ['color', 'black and white', 'monochrome', 'texture', 'pattern']):
+            return "style"
+        
         # Default category
-        return "其他"
+        return "other"
