@@ -1,0 +1,11 @@
+{
+  "simple_qwen_format": {
+    "error": "Requested tokens (53564) exceed context window of 32768"
+  },
+  "json_qwen_format": {
+    "error": "Requested tokens (53619) exceed context window of 32768"
+  },
+  "structured_format": {
+    "error": "Requested tokens (53597) exceed context window of 32768"
+  }
+}

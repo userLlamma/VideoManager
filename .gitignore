@@ -30,6 +30,7 @@ ENV/
 env/
 venv/
 ENV/
+config.json
 
 # SQLite database files
 *.db
@@ -41,6 +42,7 @@ app/static/uploads/*
 app/static/extracted_frames/*
 !app/static/uploads/.gitkeep
 !app/static/extracted_frames/.gitkeep
+models/*
 
 # Logs
 *.log

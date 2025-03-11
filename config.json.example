@@ -1,0 +1,25 @@
+{
+  "api_type": "openai",
+  "api_key": "",
+  "max_workers": 4,
+  "extraction": {
+    "min_scene_change_threshold": 30,
+    "frame_sample_interval": 24,
+    "quality": 90,
+    "max_frames_per_video": 200
+  },
+  "custom_tags": [
+    "人物特写", "风景", "动作", "对话", "过渡", "特效",
+    "室内", "室外", "白天", "夜晚", "城市", "自然",
+    "快速", "慢动作", "情感", "叙事", "黑白", "彩色"
+  ],
+  "local_classifier": {
+    "use_local_classifier": false,
+    "model_path": "/path/to/models/qwen-vl/Qwen2-VL-7B-Instruct-Q4_K_M.gguf",
+    "model_size": "7b",
+    "tags_output_file": "local_image_tags.json",
+    "gpu_layers": 0,
+    "mmproj_path": "/path/to/models/qwen-vl/qwen-qwen2-vl-7b-instruct-vision.gguf",
+    "cli_path": "/path/to/llama.cpp/bin/llama-qwen2vl-cli"
+  }
+}

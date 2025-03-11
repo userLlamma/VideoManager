@@ -15,9 +15,11 @@
   ],
   "local_classifier": {
     "use_local_classifier": true,
-    "model_path": "/mnt/block_volume/models/qwen-vl/Qwen2-VL-2B-Instruct-Q4_K_M.gguf",
-    "model_size": "2b",
+    "model_path": "D:/hk/VideoManager/models/qwen-vl/Qwen2-VL-2B-Instruct-Q8_0.gguf",
+    "model_size": "2B",
     "tags_output_file": "local_image_tags.json",
-    "gpu_layers": 0
+    "gpu_layers": 32,
+    "mmproj_path": "D:/hk/VideoManager/models/qwen-vl/mmproj-Qwen2-VL-2B-Instruct-f16.gguf",
+    "cli_path": "C:/Users/kaiyujiang/.conda/envs/video-manager/Lib/site-packages/bin/llama-qwen2vl-cli.exe"
   }
 }

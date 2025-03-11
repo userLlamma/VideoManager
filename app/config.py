@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     LOCAL_TAGS_OUTPUT_FILE: str = Field("local_image_tags.json", env="LOCAL_TAGS_OUTPUT_FILE")
     GPU_LAYERS: int = Field(0, env="GPU_LAYERS")
     
+    # Qwen-VL特定设置
+    QWEN_VL_MMPROJ_PATH: Optional[str] = Field(None, env="QWEN_VL_MMPROJ_PATH")
+    QWEN_VL_CLI_PATH: Optional[str] = Field(None, env="QWEN_VL_CLI_PATH")
+    
     # 视频处理设置
     MAX_WORKERS: int = Field(4, env="MAX_WORKERS")
     MIN_SCENE_CHANGE_THRESHOLD: int = Field(30, env="MIN_SCENE_CHANGE_THRESHOLD")
@@ -93,6 +97,11 @@ def load_config_from_json(config_file: str = "config.json") -> None:
                         settings.LOCAL_TAGS_OUTPUT_FILE = local_config["tags_output_file"]
                     if "gpu_layers" in local_config:
                         settings.GPU_LAYERS = local_config["gpu_layers"]
+                    # 新增Qwen-VL特定设置
+                    if "mmproj_path" in local_config:
+                        settings.QWEN_VL_MMPROJ_PATH = local_config["mmproj_path"]
+                    if "cli_path" in local_config:
+                        settings.QWEN_VL_CLI_PATH = local_config["cli_path"]
                     
         except Exception as e:
             print(f"加载配置文件失败: {e}")

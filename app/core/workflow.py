@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.frame_extractor import FrameExtractor
-# 导入两个分类器
+# Import the classifiers
 from app.core.image_classifier import ImageClassifier
-from app.core.local_image_classifier import LocalImageClassifier
+from app.core.local_image_classifier  import QwenVLClassifier  # Use our new implementation
 from app.db import crud, models
 from app.schemas.material import MaterialCreate
 
@@ -36,11 +36,13 @@ class MaterialProcessWorkflow:
         
         # 根据配置选择分类器
         if settings.USE_LOCAL_CLASSIFIER:
-            logger.info("使用本地图像分类器")
-            self.classifier = LocalImageClassifier(
+            logger.info("使用本地图像分类器 (Qwen-VL)")
+            self.classifier = QwenVLClassifier(
                 model_path=settings.LOCAL_MODEL_PATH,
+                mmproj_path=settings.QWEN_VL_MMPROJ_PATH,
+                cli_path=settings.QWEN_VL_CLI_PATH,
                 model_size=settings.LOCAL_MODEL_SIZE,
-                max_workers=settings.MAX_WORKERS,
+                max_workers=min(settings.MAX_WORKERS, 3),  # Limit workers for local classification
                 custom_tags=settings.CUSTOM_TAGS,
                 output_file=settings.LOCAL_TAGS_OUTPUT_FILE,
                 gpu_layers=settings.GPU_LAYERS
@@ -98,8 +100,8 @@ class MaterialProcessWorkflow:
                 }
             
             # 分类图像
-            if isinstance(self.classifier, LocalImageClassifier):
-                logger.info("步骤2: 本地模型分类图像")
+            if isinstance(self.classifier, QwenVLClassifier):
+                logger.info("步骤2: 使用本地Qwen-VL模型分类图像")
             else:
                 logger.info("步骤2: 云端分类图像")
                 
